@@ -6,8 +6,8 @@ import java.util.ArrayList;
 public class QuadTree {
     Rectangle bound;
     int capacity;
-    //    ArrayList<Particle> points;
     ArrayList<Particle> points;
+
     QuadTree tl, tr, bl, br;
     boolean div;
     PApplet pap;
@@ -15,36 +15,44 @@ public class QuadTree {
     QuadTree(PApplet sketch, Rectangle boun, int capac) {
         this.bound = boun;
         this.capacity = capac;
-        this.points = new ArrayList<Particle>();
+        this.points = new ArrayList<>();
         this.div = false;
         this.pap = sketch;
     }
 
     void insert(Particle p) {
-        if (!this.bound.contains(p))
+        if (!bound.contains(p)) {
             return;
-        if (!this.div && this.points.size() < this.capacity) {
-            this.points.add(p);
-        } else {
-            if (!this.div)
-                this.divide();
-            this.insert(points);
-            this.tl.insert(p);
-            this.tr.insert(p);
-            this.bl.insert(p);
-            this.br.insert(p);
         }
+        if (points.size() < capacity) {
+            points.add(p);
+        } else {
+            if (!div) {
+                divide();
+            }
+            tl.insert(p);
+            tr.insert(p);
+            bl.insert(p);
+            br.insert(p);
+        }
+
     }
 
     void insert(ArrayList<Particle> tp) {
-        for (Particle t : tp) {
-            this.tl.insert(t);
-            this.tr.insert(t);
-            this.bl.insert(t);
-            this.br.insert(t);
+        if (!this.div && this.points.size() + tp.size() < this.capacity) {
+            this.points.addAll(tp);
+        } else {
+            if (!this.div)
+                this.divide();
+            for (Particle t : tp) {
+                this.tl.insert(t);
+                this.tr.insert(t);
+                this.bl.insert(t);
+                this.br.insert(t);
+            }
         }
 
-        tp.clear();
+
     }
 
     void divide() {
@@ -61,7 +69,7 @@ public class QuadTree {
     }
 
     ArrayList<Particle> query(Rectangle inter) {
-        ArrayList<Particle> found = new ArrayList<Particle>();
+        ArrayList<Particle> found = new ArrayList<>();
 
         if (this.bound.intersects(inter)) {
             if (!div) {
@@ -86,7 +94,7 @@ public class QuadTree {
     }
 
     ArrayList<Particle> query(Circle inter) {
-        ArrayList<Particle> found = new ArrayList<Particle>();
+        ArrayList<Particle> found = new ArrayList<>();
 
         if (inter.intersects(this.bound)) {
             if (!div) {
@@ -135,15 +143,6 @@ public class QuadTree {
         }
     }
 
-    void update_points() {
-        ArrayList<Particle> temp = new ArrayList<Particle>();
-        getPoints(temp);
-        for (Particle p : temp) {
-            p.update();
-        }
-        this.clear();
-        this.insert(temp);
-    }
 
     void getPoints(ArrayList<Particle> points) {
         if (!div) {

@@ -5,14 +5,13 @@ import java.util.ArrayList;
 
 public class Particle {
     PVector position;
-    private PVector velocity;
-    private PVector acceleration;
-    private float mass;
-    private float radius;
+    PVector velocity;
+    private final PVector acceleration;
+    private final float mass;
+    float radius;
     PApplet parent;
-    QuadTree quadTree;
 
-    public Particle(PApplet sketch, QuadTree qt, float x, float y, float mass, float radius) {
+    public Particle(PApplet sketch, float x, float y, float mass, float radius) {
         this.position = new PVector(x, y);
         float velocity = (float) (Math.random() * 2 - 1);
         this.velocity = new PVector(velocity, velocity);
@@ -21,41 +20,45 @@ public class Particle {
 //        this.radius = radius;
         this.radius = (float) (Math.random() * radius);
         this.parent = sketch;
-        this.quadTree = qt;
     }
 
     public boolean does_collide(Particle other) {
-        PVector distance = PVector.sub(position, other.position);
-        float distanceMagnitude = distance.mag();
-        if (distanceMagnitude < radius + other.radius) {
-            return true;
-        }
-        PVector relativeVelocity = PVector.sub(velocity, other.velocity);
-        float a = PVector.dot(relativeVelocity, relativeVelocity);
-        float b = PVector.dot(distance, relativeVelocity);
-        if (b > 0) {
-            return false;
-        }
-        float c = distanceMagnitude * distanceMagnitude - (radius + other.radius) * (radius + other.radius);
-        if (c < 0) {
-            return false;
-        }
-        return true;
+        float distance = PVector.dist(this.position, other.position);
+        return distance < this.radius + other.radius;
     }
 
-    public ArrayList does_collide(ArrayList<Particle> particles) {
-        ArrayList<Particle> colliding = new ArrayList<Particle>();
-        for (Particle other : particles) {
-            if (does_collide(other)) {
-                colliding.add(other);
-            }
+    public float time_to_collision(Particle other) {
+        PVector relative_position = PVector.sub(this.position, other.position);
+        PVector relative_velocity = PVector.sub(this.velocity, other.velocity);
+        float distance = relative_position.dot(relative_position);
+        if (distance < 0) {
+            return 0;
         }
-        return colliding;
+        float b = relative_velocity.dot(relative_position);
+        if (b >= 0) {
+            return -1.0f;
+        }
+        float a = relative_velocity.dot(relative_velocity);
+        float d = b * b - a * distance;
+        if (d < 0) {
+            return -1.0f;
+        }
+        return (-b - (float) Math.sqrt(d)) / a;
+    }
+
+    public boolean does_collide_in_timestep(Particle other, float timestep) {
+        float time_to_collision = this.time_to_collision(other);
+        if (time_to_collision < 0) {
+            return false;
+        }
+        return !(time_to_collision > timestep);
     }
 
     public void update() {
         acceleration.mult(1 / mass);
         velocity.add(acceleration);
+        // Optional: limit the velocity to a maximum speed
+        velocity.limit(5);
         position.add(velocity);
         acceleration.mult(0);
         // Make sure the particle stays in the window
@@ -75,27 +78,38 @@ public class Particle {
             position.y = parent.height - 1;
             velocity.y *= -1;
         }
-        // Collision detection and response
-        Circle q = new Circle(parent, position.x, position.y, radius);
-        for(Particle p : quadTree.query(q)) {
+
+    }
+
+    public void check_colliding(ArrayList<Particle> particles, float deltaT) {
+        for(Particle p : particles) {
             if(p != this) {
-                if(does_collide(p)) {
+                if(does_collide_in_timestep(p, deltaT)) {
                     PVector collisionNormal = PVector.sub(position, p.position);
                     collisionNormal.normalize();
-                    PVector relativeVelocity = PVector.sub(velocity, p.velocity);
-                    float j = -(1 + 0.5f) * PVector.dot(relativeVelocity, collisionNormal);
-                    j /= (1 / mass + 1 / p.mass);
-                    PVector impulse = PVector.mult(collisionNormal, j);
-                    acceleration.add(PVector.mult(impulse, 1 / mass));
-                    p.acceleration.add(PVector.mult(impulse, 1 / p.mass));
+                    float v1_normal = PVector.dot(collisionNormal, velocity);
+                    float v2_normal = PVector.dot(collisionNormal, p.velocity);
+                    float p_value = (2 * (v1_normal - v2_normal)) / (mass + p.mass);
+                    PVector final_v1 = PVector.sub(velocity, PVector.mult(collisionNormal, p_value * mass));
+                    PVector final_v2 = PVector.add(p.velocity, PVector.mult(collisionNormal, p_value * p.mass));
+                    velocity = final_v1;
+                    p.velocity = final_v2;
+                    parent.fill(0, 255, 0);
+//                    position.add(PVector.mult(collisionNormal, radius));
+//                    p.position.add(PVector.mult(collisionNormal, p.radius));
                 }
             }
         }
     }
 
+    public PVector get_momentum() {
+        return PVector.mult(velocity, mass);
+    }
+
+
 
     public void show() {
-        parent.fill(255, 0, 0);
         parent.circle(position.x, position.y, radius);
+        parent.fill(255, 0, 0);
     }
 }
